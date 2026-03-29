@@ -22,6 +22,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import de.stroebele.mindyourself.domain.model.ReminderType
 import de.stroebele.mindyourself.ui.screen.HistoryScreen
+import de.stroebele.mindyourself.ui.screen.HydrationPortionSizeScreen
 import de.stroebele.mindyourself.ui.screen.LocationListScreen
 import de.stroebele.mindyourself.ui.screen.NamedLocationEditScreen
 import de.stroebele.mindyourself.ui.screen.ReminderEditScreen
@@ -40,6 +41,7 @@ private sealed class Screen(val route: String, val label: String) {
     data object LocationList : Screen("locations", "Orte")
     data object LocationNew : Screen("locations/new", "Neuer Ort")
     data object LocationEdit : Screen("locations/{locationId}", "Ort bearbeiten")
+    data object PortionSizes : Screen("portion-sizes", "Trinkmengen")
 }
 
 @Composable
@@ -111,6 +113,7 @@ fun MindYourselfNavGraph() {
                 SettingsScreen(
                     onNavigateToLocations = { navController.navigate(Screen.LocationList.route) },
                     onNavigateToVacation = { navController.navigate(Screen.Vacation.route) },
+                    onNavigateToPortionSizes = { navController.navigate(Screen.PortionSizes.route) },
                 )
             }
             composable(Screen.Vacation.route) {
@@ -128,6 +131,9 @@ fun MindYourselfNavGraph() {
                 NamedLocationEditScreen(
                     onSaved = { navController.popBackStack() },
                 )
+            }
+            composable(Screen.PortionSizes.route) {
+                HydrationPortionSizeScreen()
             }
             composable(
                 route = "locations/{locationId}",

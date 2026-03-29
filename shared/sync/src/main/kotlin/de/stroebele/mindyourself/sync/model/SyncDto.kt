@@ -46,3 +46,15 @@ data class VacationPeriodDto(
 data class VacationSettingsDto(
     val periods: List<VacationPeriodDto>,
 )
+
+data class AppSettingsDto(
+    val stepDailyGoal: Int,
+    val hydrationDailyGoalMl: Int = 0,
+)
+
+/** Hydration log sourced from Health Connect — Phone → Watch direction */
+data class HydrationExternalLogDto(
+    val healthConnectId: String,
+    val amountMl: Int,
+    val timestampEpochMs: Long,
+)

@@ -16,8 +16,8 @@ class ReminderEvaluatorTest {
     // ── Movement ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `movement fires when steps below threshold and window elapsed`() {
-        val config = MovementConfig(stepThreshold = 500, windowMinutes = 120)
+    fun `movement fires when steps below threshold and repeat interval elapsed`() {
+        val config = MovementConfig(stepThreshold = 500, windowMinutes = 30, repeatIntervalMinutes = 30)
         val lastFired = Instant.EPOCH
         val now = Instant.ofEpochSecond(3600L * 3) // 3h after epoch
         assertTrue(ReminderEvaluator.movementShouldFire(config, stepsSinceWindowStart = 100, now, lastFired))
@@ -25,17 +25,17 @@ class ReminderEvaluatorTest {
 
     @Test
     fun `movement does not fire when steps meet threshold`() {
-        val config = MovementConfig(stepThreshold = 500, windowMinutes = 120)
+        val config = MovementConfig(stepThreshold = 500, windowMinutes = 30, repeatIntervalMinutes = 30)
         val lastFired = Instant.EPOCH
         val now = Instant.ofEpochSecond(3600L * 3)
         assertFalse(ReminderEvaluator.movementShouldFire(config, stepsSinceWindowStart = 600, now, lastFired))
     }
 
     @Test
-    fun `movement does not fire when within re-fire window`() {
-        val config = MovementConfig(stepThreshold = 500, windowMinutes = 120)
+    fun `movement does not fire when within repeat interval`() {
+        val config = MovementConfig(stepThreshold = 500, windowMinutes = 30, repeatIntervalMinutes = 30)
         val now = Instant.ofEpochSecond(3600L)
-        val lastFired = now.minusSeconds(60) // only 1 min ago — window is 120 min
+        val lastFired = now.minusSeconds(60) // only 1 min ago — repeat interval is 30 min
         assertFalse(ReminderEvaluator.movementShouldFire(config, stepsSinceWindowStart = 100, now, lastFired))
     }
 
@@ -70,66 +70,99 @@ class ReminderEvaluatorTest {
 
     // ── Hydration ─────────────────────────────────────────────────────────────
 
+    private val activeFrom = LocalTime.of(8, 0)
+    private val activeUntil = LocalTime.of(22, 0)
+
     @Test
-    fun `hydration fires when goal not reached and interval elapsed`() {
-        val config = HydrationConfig(dailyGoalMl = 2000, intervalMinutes = 60)
+    fun `hydration fires when no recent log within window`() {
+        val config = HydrationConfig(reminderGoalMl = 2000, repeatIntervalMinutes = 60, noLogWindowMinutes = 60)
+        val now = Instant.ofEpochSecond(3600L * 12) // noon in epoch terms
         val lastFired = Instant.EPOCH
-        val now = Instant.ofEpochSecond(3600L * 3)
-        assertTrue(ReminderEvaluator.hydrationShouldFire(config, todayMl = 500, now, lastFired))
+        // lastLogTime = null → no log at all
+        assertTrue(
+            ReminderEvaluator.hydrationShouldFire(
+                config, todayMl = 500, dailyGoalMl = 2000, lastLogTime = null,
+                now, lastFired, LocalTime.of(10, 0), activeFrom, activeUntil,
+            )
+        )
+    }
+
+    @Test
+    fun `hydration fires when behind schedule by time fraction`() {
+        val config = HydrationConfig(reminderGoalMl = 2000, repeatIntervalMinutes = 60, noLogWindowMinutes = 60)
+        val now = Instant.ofEpochSecond(3600L * 12)
+        val lastFired = Instant.EPOCH
+        val recentLog = now.minusSeconds(10) // logged 10s ago — no "no recent log" trigger
+        // Window 8–22 = 14h total. At 15:00 = 7h elapsed = 50% of window. 200/2000 = 10% → behind schedule
+        assertTrue(
+            ReminderEvaluator.hydrationShouldFire(
+                config, todayMl = 200, dailyGoalMl = 2000, lastLogTime = recentLog,
+                now, lastFired, LocalTime.of(15, 0), activeFrom, activeUntil,
+            )
+        )
     }
 
     @Test
     fun `hydration does not fire when daily goal reached`() {
-        val config = HydrationConfig(dailyGoalMl = 2000, intervalMinutes = 60)
+        val config = HydrationConfig(reminderGoalMl = 2000, repeatIntervalMinutes = 60, noLogWindowMinutes = 60)
+        val now = Instant.ofEpochSecond(3600L * 12)
         val lastFired = Instant.EPOCH
-        val now = Instant.ofEpochSecond(3600L * 3)
-        assertFalse(ReminderEvaluator.hydrationShouldFire(config, todayMl = 2000, now, lastFired))
+        assertFalse(
+            ReminderEvaluator.hydrationShouldFire(
+                config, todayMl = 2000, dailyGoalMl = 2000, lastLogTime = null,
+                now, lastFired, LocalTime.of(10, 0), activeFrom, activeUntil,
+            )
+        )
     }
 
     @Test
-    fun `hydration does not fire before interval elapsed`() {
-        val config = HydrationConfig(dailyGoalMl = 2000, intervalMinutes = 60)
-        val now = Instant.ofEpochSecond(3600L * 3)
+    fun `hydration does not fire before repeat interval elapsed`() {
+        val config = HydrationConfig(reminderGoalMl = 2000, repeatIntervalMinutes = 60, noLogWindowMinutes = 60)
+        val now = Instant.ofEpochSecond(3600L * 12)
         val lastFired = now.minusSeconds(30 * 60) // 30 min ago, interval is 60 min
-        assertFalse(ReminderEvaluator.hydrationShouldFire(config, todayMl = 500, now, lastFired))
+        assertFalse(
+            ReminderEvaluator.hydrationShouldFire(
+                config, todayMl = 200, dailyGoalMl = 2000, lastLogTime = null,
+                now, lastFired, LocalTime.of(10, 0), activeFrom, activeUntil,
+            )
+        )
     }
 
     // ── Supplement ────────────────────────────────────────────────────────────
 
+    private fun supplementConfig() = SupplementConfig(
+        scheduledTime = LocalTime.of(8, 0),
+        items = listOf(
+            de.stroebele.mindyourself.domain.model.SupplementItem(
+                name = "Vitamin D",
+                amount = 1,
+                form = de.stroebele.mindyourself.domain.model.SupplementForm.CAPSULE,
+            )
+        ),
+    )
+
     @Test
     fun `supplement fires when within scheduled time window`() {
-        val config = SupplementConfig(
-            supplementName = "Vitamin D",
-            scheduledTimes = listOf(LocalTime.of(8, 0)),
-        )
         val currentTime = LocalTime.of(8, 5) // 5 min after schedule — within ±10 min
         val lastFired = Instant.EPOCH
         val now = Instant.ofEpochSecond(3600L * 24)
-        assertTrue(ReminderEvaluator.supplementShouldFire(config, currentTime, now, lastFired))
+        assertTrue(ReminderEvaluator.supplementShouldFire(supplementConfig(), currentTime, now, lastFired))
     }
 
     @Test
     fun `supplement does not fire outside scheduled time window`() {
-        val config = SupplementConfig(
-            supplementName = "Vitamin D",
-            scheduledTimes = listOf(LocalTime.of(8, 0)),
-        )
         val currentTime = LocalTime.of(12, 0) // 4h after schedule
         val lastFired = Instant.EPOCH
         val now = Instant.ofEpochSecond(3600L * 24)
-        assertFalse(ReminderEvaluator.supplementShouldFire(config, currentTime, now, lastFired))
+        assertFalse(ReminderEvaluator.supplementShouldFire(supplementConfig(), currentTime, now, lastFired))
     }
 
     @Test
     fun `supplement does not re-fire within 1 hour`() {
-        val config = SupplementConfig(
-            supplementName = "Vitamin D",
-            scheduledTimes = listOf(LocalTime.of(8, 0)),
-        )
         val currentTime = LocalTime.of(8, 5)
         val now = Instant.ofEpochSecond(3600L * 24)
         val lastFired = now.minusSeconds(30 * 60) // 30 min ago
-        assertFalse(ReminderEvaluator.supplementShouldFire(config, currentTime, now, lastFired))
+        assertFalse(ReminderEvaluator.supplementShouldFire(supplementConfig(), currentTime, now, lastFired))
     }
 
     // ── Screen Break ──────────────────────────────────────────────────────────

@@ -16,6 +16,12 @@ object SyncPaths {
     // Phone → Watch: Vacation mode settings
     const val VACATION_SETTINGS = "/vacation_settings"
 
+    // Phone → Watch: Global app settings (e.g. step daily goal)
+    const val APP_SETTINGS = "/app_settings"
+
+    // Phone → Watch: Hydration logs sourced from Health Connect
+    const val HC_HYDRATION_LOGS = "/hydration_hc_logs"
+
     // Message channels (fire-and-forget, not stored)
     const val MSG_SYNC_REQUEST = "/sync/request"
     const val MSG_SYNC_ACK = "/sync/ack"

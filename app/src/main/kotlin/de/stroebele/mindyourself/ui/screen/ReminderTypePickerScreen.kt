@@ -30,7 +30,7 @@ fun ReminderTypePickerScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(ReminderType.entries) { type ->
+            items(ReminderType.entries.filter { it != ReminderType.SEDENTARY && it != ReminderType.SCREEN_BREAK }) { type ->
                 Card(
                     onClick = { onTypePicked(type) },
                     modifier = Modifier.fillMaxWidth(),
@@ -55,9 +55,9 @@ private fun ReminderType.icon(): String = when (this) {
 }
 
 private fun ReminderType.displayName(): String = when (this) {
-    ReminderType.MOVEMENT -> "Bewegungserinnerung"
+    ReminderType.MOVEMENT -> "Bewegung"
     ReminderType.SEDENTARY -> "Sitz-Pause"
-    ReminderType.HYDRATION -> "Hydration"
+    ReminderType.HYDRATION -> "Trinken"
     ReminderType.SUPPLEMENT -> "Supplement"
     ReminderType.SCREEN_BREAK -> "Bildschirmpause"
 }

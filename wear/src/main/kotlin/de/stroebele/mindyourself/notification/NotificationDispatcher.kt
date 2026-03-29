@@ -8,6 +8,8 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import de.stroebele.mindyourself.domain.model.ReminderType
+import de.stroebele.mindyourself.domain.model.SupplementForm
+import de.stroebele.mindyourself.domain.model.SupplementItem
 import de.stroebele.mindyourself.receiver.NotificationActionReceiver
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -22,13 +24,13 @@ class NotificationDispatcher @Inject constructor(
         createChannel()
     }
 
-    fun showMovementReminder() = show(
+    fun showMovementReminder(steps: Long, stepThreshold: Int, windowMinutes: Int) = show(
         id = NotificationId.MOVEMENT,
         title = "Zeit zum Bewegen!",
-        text = "Du warst in den letzten 2 Stunden wenig aktiv.",
+        text = "$steps / $stepThreshold Schritte in den letzten $windowMinutes Minuten.",
+        timeoutMs = 5_000L,
         actions = listOf(
-            action("Jetzt bewegen", Action.DISMISS, NotificationId.MOVEMENT),
-            action("Snooze 10 min", Action.SNOOZE_10, NotificationId.MOVEMENT),
+            action("Schließen", Action.DISMISS, NotificationId.MOVEMENT),
         )
     )
 
@@ -42,25 +44,39 @@ class NotificationDispatcher @Inject constructor(
         )
     )
 
-    fun showHydrationReminder(remainingMl: Int) = show(
-        id = NotificationId.HYDRATION,
-        title = "Trinkerinnerung",
-        text = "Noch $remainingMl ml bis zu deinem Tagesziel.",
-        actions = listOf(
-            action("Getrunken", Action.LOG_HYDRATION, NotificationId.HYDRATION),
-            action("Snooze 30 min", Action.SNOOZE_30, NotificationId.HYDRATION),
+    fun showHydrationReminder(todayMl: Int, dailyGoalMl: Int) {
+        val percent = if (dailyGoalMl > 0) (todayMl * 100 / dailyGoalMl) else 0
+        show(
+            id = NotificationId.HYDRATION,
+            title = "Trinkerinnerung",
+            text = "$todayMl / $dailyGoalMl ml ($percent%)",
+            timeoutMs = 5_000L,
+            actions = listOf(
+                action("Erfassen", Action.OPEN_HYDRATION_LOG, NotificationId.HYDRATION),
+                action("Schließen", Action.DISMISS, NotificationId.HYDRATION),
+            )
         )
-    )
+    }
 
-    fun showSupplementReminder(name: String) = show(
-        id = NotificationId.SUPPLEMENT,
-        title = name,
-        text = "Zeit für dein Supplement.",
-        actions = listOf(
-            action("Genommen", Action.LOG_SUPPLEMENT.withExtra(EXTRA_SUPPLEMENT_NAME, name), NotificationId.SUPPLEMENT),
-            action("Später erinnern", Action.SNOOZE_30, NotificationId.SUPPLEMENT),
+    fun showSupplementReminder(items: List<SupplementItem>) {
+        val text = items.joinToString("\n") { "${it.amount} ${it.form.display(it.amount)} ${it.name}" }
+        show(
+            id = NotificationId.SUPPLEMENT,
+            title = "Zeit für deine Supplemente",
+            text = text,
+            actions = listOf(
+                action("Genommen", Action.LOG_SUPPLEMENT, NotificationId.SUPPLEMENT),
+                action("Später erinnern", Action.SNOOZE_30, NotificationId.SUPPLEMENT),
+            )
         )
-    )
+    }
+
+    private fun SupplementForm.display(amount: Int): String = when (this) {
+        SupplementForm.CAPSULE -> if (amount == 1) "Kapsel" else "Kapseln"
+        SupplementForm.PILL -> if (amount == 1) "Tablette" else "Tabletten"
+        SupplementForm.DROP -> "Tropfen"
+        SupplementForm.GUM -> if (amount == 1) "Gummie" else "Gummies"
+    }
 
     fun showScreenBreakReminder() = show(
         id = NotificationId.SCREEN_BREAK,
@@ -81,6 +97,7 @@ class NotificationDispatcher @Inject constructor(
         title: String,
         text: String,
         actions: List<NotificationCompat.Action>,
+        timeoutMs: Long? = null,
     ) {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -88,6 +105,7 @@ class NotificationDispatcher @Inject constructor(
             .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
+            .apply { timeoutMs?.let { setTimeoutAfter(it) } }
             .apply { actions.forEach(::addAction) }
             .build()
 
@@ -106,8 +124,6 @@ class NotificationDispatcher @Inject constructor(
         return NotificationCompat.Action(0, label, pi)
     }
 
-    private fun Action.withExtra(key: String, value: String): Action = this // extras set on intent in action()
-
     private fun createChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID, "mindYourself Reminder",
@@ -120,7 +136,6 @@ class NotificationDispatcher @Inject constructor(
         const val CHANNEL_ID = "mindyourself_reminders"
         const val EXTRA_ACTION = "action"
         const val EXTRA_NOTIFICATION_ID = "notif_id"
-        const val EXTRA_SUPPLEMENT_NAME = "supplement_name"
     }
 }
 
@@ -138,4 +153,5 @@ enum class Action {
     SNOOZE_30,
     LOG_HYDRATION,
     LOG_SUPPLEMENT,
+    OPEN_HYDRATION_LOG,
 }

@@ -1,5 +1,6 @@
 package de.stroebele.mindyourself.receiver
 
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -20,21 +21,26 @@ class NotificationActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val actionName = intent.getStringExtra(NotificationDispatcher.EXTRA_ACTION) ?: return
         val notifId = intent.getIntExtra(NotificationDispatcher.EXTRA_NOTIFICATION_ID, -1)
-        val supplementName = intent.getStringExtra(NotificationDispatcher.EXTRA_SUPPLEMENT_NAME)
 
         Log.d(TAG, "Notification action: $actionName (notif=$notifId)")
+
+        // Navigation actions are handled here directly — Workers cannot start Activities
+        if (actionName == Action.OPEN_HYDRATION_LOG.name) {
+            context.getSystemService(NotificationManager::class.java).cancel(notifId)
+            context.packageManager.getLaunchIntentForPackage(context.packageName)
+                ?.apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+                ?.let { context.startActivity(it) }
+            return
+        }
 
         val data = Data.Builder()
             .putString(HandleNotificationActionWorker.KEY_ACTION, actionName)
             .putInt(HandleNotificationActionWorker.KEY_NOTIF_ID, notifId)
-            .apply { supplementName?.let { putString(HandleNotificationActionWorker.KEY_SUPPLEMENT_NAME, it) } }
             .build()
 
-        val request = OneTimeWorkRequestBuilder<HandleNotificationActionWorker>()
-            .setInputData(data)
-            .build()
-
-        WorkManager.getInstance(context).enqueue(request)
+        WorkManager.getInstance(context).enqueue(
+            OneTimeWorkRequestBuilder<HandleNotificationActionWorker>().setInputData(data).build()
+        )
     }
 
     companion object {

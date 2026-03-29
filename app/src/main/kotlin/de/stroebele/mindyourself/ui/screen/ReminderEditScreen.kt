@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -47,6 +48,8 @@ import de.stroebele.mindyourself.domain.model.ReminderType
 import de.stroebele.mindyourself.domain.model.ScreenBreakConfig
 import de.stroebele.mindyourself.domain.model.SedentaryConfig
 import de.stroebele.mindyourself.domain.model.SupplementConfig
+import de.stroebele.mindyourself.domain.model.SupplementForm
+import de.stroebele.mindyourself.domain.model.SupplementItem
 import de.stroebele.mindyourself.ui.viewmodel.ReminderEditViewModel
 import java.time.DayOfWeek
 import java.time.LocalTime
@@ -135,20 +138,22 @@ fun ReminderEditScreen(
                 }
             }
 
-            // Active window
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TimeField(
-                    label = "Von",
-                    time = config.activeFrom,
-                    onTimeChange = { viewModel.update(config.copy(activeFrom = it)) },
-                    modifier = Modifier.weight(1f),
-                )
-                TimeField(
-                    label = "Bis",
-                    time = config.activeUntil,
-                    onTimeChange = { viewModel.update(config.copy(activeUntil = it)) },
-                    modifier = Modifier.weight(1f),
-                )
+            // Active window (not shown for supplements — time is part of the type config)
+            if (config.type != ReminderType.SUPPLEMENT) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TimeField(
+                        label = "Von",
+                        time = config.activeFrom,
+                        onTimeChange = { viewModel.update(config.copy(activeFrom = it)) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    TimeField(
+                        label = "Bis",
+                        time = config.activeUntil,
+                        onTimeChange = { viewModel.update(config.copy(activeUntil = it)) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
 
             // Type-specific fields
@@ -287,9 +292,14 @@ private fun TypeConfigFields(
                 onValueChange = { onUpdate(config.copy(typeConfig = tc.copy(stepThreshold = it))) },
             )
             NumberField(
-                label = "Zeitfenster (Minuten)",
+                label = "Schrittzähler-Fenster (Minuten)",
                 value = tc.windowMinutes,
                 onValueChange = { onUpdate(config.copy(typeConfig = tc.copy(windowMinutes = it))) },
+            )
+            NumberField(
+                label = "Wiederholungsintervall (Minuten)",
+                value = tc.repeatIntervalMinutes,
+                onValueChange = { onUpdate(config.copy(typeConfig = tc.copy(repeatIntervalMinutes = it))) },
             )
         }
         is SedentaryConfig -> {
@@ -306,30 +316,50 @@ private fun TypeConfigFields(
         }
         is HydrationConfig -> {
             NumberField(
-                label = "Tagesziel (ml)",
-                value = tc.dailyGoalMl,
-                onValueChange = { onUpdate(config.copy(typeConfig = tc.copy(dailyGoalMl = it))) },
+                label = "Zielwert im Zeitraum (ml)",
+                value = tc.reminderGoalMl,
+                onValueChange = { onUpdate(config.copy(typeConfig = tc.copy(reminderGoalMl = it))) },
             )
             NumberField(
-                label = "Intervall (Minuten)",
-                value = tc.intervalMinutes,
-                onValueChange = { onUpdate(config.copy(typeConfig = tc.copy(intervalMinutes = it))) },
+                label = "Wiederholungsintervall (Minuten)",
+                value = tc.repeatIntervalMinutes,
+                onValueChange = { onUpdate(config.copy(typeConfig = tc.copy(repeatIntervalMinutes = it))) },
+            )
+            NumberField(
+                label = "Keine-Aufnahme-Fenster (Minuten)",
+                value = tc.noLogWindowMinutes,
+                onValueChange = { onUpdate(config.copy(typeConfig = tc.copy(noLogWindowMinutes = it))) },
             )
         }
         is SupplementConfig -> {
-            OutlinedTextField(
-                value = tc.supplementName,
-                onValueChange = { onUpdate(config.copy(typeConfig = tc.copy(supplementName = it))) },
-                label = { Text("Name des Supplements") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            val firstTime = tc.scheduledTimes.firstOrNull() ?: LocalTime.of(8, 0)
             TimeField(
                 label = "Erinnerungszeit",
-                time = firstTime,
-                onTimeChange = { onUpdate(config.copy(typeConfig = tc.copy(scheduledTimes = listOf(it)))) },
+                time = tc.scheduledTime,
+                onTimeChange = { onUpdate(config.copy(typeConfig = tc.copy(scheduledTime = it))) },
             )
+            HorizontalDivider()
+            Text("Supplemente", style = MaterialTheme.typography.labelMedium)
+            tc.items.forEachIndexed { index, item ->
+                SupplementItemRow(
+                    item = item,
+                    onItemChange = { updated ->
+                        onUpdate(config.copy(typeConfig = tc.copy(
+                            items = tc.items.toMutableList().also { it[index] = updated }
+                        )))
+                    },
+                    onRemove = if (tc.items.size > 1) {
+                        { onUpdate(config.copy(typeConfig = tc.copy(items = tc.items - item))) }
+                    } else null,
+                )
+            }
+            TextButton(
+                onClick = {
+                    onUpdate(config.copy(typeConfig = tc.copy(
+                        items = tc.items + SupplementItem(name = "", amount = 1, form = SupplementForm.CAPSULE)
+                    )))
+                },
+            ) { Text("+ Supplement hinzufügen") }
+            HorizontalDivider()
             NumberField(
                 label = "Snooze-Dauer (Minuten)",
                 value = tc.snoozeDurationMinutes,
@@ -349,6 +379,72 @@ private fun TypeConfigFields(
             )
         }
     }
+}
+
+@Composable
+private fun SupplementItemRow(
+    item: SupplementItem,
+    onItemChange: (SupplementItem) -> Unit,
+    onRemove: (() -> Unit)?,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = item.name,
+                onValueChange = { onItemChange(item.copy(name = it)) },
+                label = { Text("Name") },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+            )
+            if (onRemove != null) {
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Default.Close, contentDescription = "Entfernen")
+                }
+            }
+        }
+        NumberField(
+            label = "Menge",
+            value = item.amount,
+            onValueChange = { onItemChange(item.copy(amount = it.coerceAtLeast(1))) },
+            modifier = Modifier.fillMaxWidth(0.4f),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            SupplementForm.entries.forEach { form ->
+                val selected = item.form == form
+                FilterChip(
+                    selected = selected,
+                    onClick = { onItemChange(item.copy(form = form)) },
+                    label = { Text(form.label()) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        selected = selected,
+                        enabled = true,
+                        selectedBorderColor = MaterialTheme.colorScheme.primary,
+                        borderColor = MaterialTheme.colorScheme.outline,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+private fun SupplementForm.label(): String = when (this) {
+    SupplementForm.CAPSULE -> "Kapsel"
+    SupplementForm.PILL -> "Tablette"
+    SupplementForm.DROP -> "Tropfen"
+    SupplementForm.GUM -> "Gummie"
 }
 
 @Composable

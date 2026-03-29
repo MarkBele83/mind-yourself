@@ -8,4 +8,6 @@ data class HydrationLog(
     val timestamp: Instant = Instant.now(),
     /** True once synced to the phone app */
     val synced: Boolean = false,
+    /** Non-null for logs sourced from Health Connect — used for deduplication */
+    val healthConnectId: String? = null,
 )

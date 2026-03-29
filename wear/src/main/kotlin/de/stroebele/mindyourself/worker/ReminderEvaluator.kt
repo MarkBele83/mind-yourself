@@ -22,7 +22,7 @@ object ReminderEvaluator {
         now: Instant,
         lastFired: Instant,
     ): Boolean {
-        if (now.epochSecond - lastFired.epochSecond < config.windowMinutes * 60L) return false
+        if (now.epochSecond - lastFired.epochSecond < config.repeatIntervalMinutes * 60L) return false
         return stepsSinceWindowStart < config.stepThreshold
     }
 
@@ -39,12 +39,37 @@ object ReminderEvaluator {
     fun hydrationShouldFire(
         config: HydrationConfig,
         todayMl: Int,
+        dailyGoalMl: Int,
+        lastLogTime: Instant?,
         now: Instant,
         lastFired: Instant,
+        currentTime: LocalTime,
+        activeFrom: LocalTime,
+        activeUntil: LocalTime,
     ): Boolean {
-        if (now.epochSecond - lastFired.epochSecond < config.intervalMinutes * 60L) return false
-        return config.dailyGoalMl - todayMl > 0
+        if (now.epochSecond - lastFired.epochSecond < config.repeatIntervalMinutes * 60L) return false
+        val goal = if (dailyGoalMl > 0) dailyGoalMl else config.reminderGoalMl
+        if (todayMl >= goal) return false
+
+        val secondsSinceLastLog = lastLogTime?.let { now.epochSecond - it.epochSecond } ?: Long.MAX_VALUE
+        val noRecentLog = secondsSinceLastLog >= config.noLogWindowMinutes * 60L
+
+        val totalWindowSecs = windowDurationSeconds(activeFrom, activeUntil)
+        val elapsedSecs = elapsedInWindowSeconds(activeFrom, currentTime)
+        val intakeFraction = todayMl.toDouble() / goal
+        val timeFraction = if (totalWindowSecs > 0) elapsedSecs.toDouble() / totalWindowSecs else 0.0
+        val behindSchedule = intakeFraction < timeFraction
+
+        return noRecentLog || behindSchedule
     }
+
+    private fun windowDurationSeconds(from: LocalTime, until: LocalTime): Long =
+        if (from <= until) (until.toSecondOfDay() - from.toSecondOfDay()).toLong()
+        else (86400 - from.toSecondOfDay() + until.toSecondOfDay()).toLong()
+
+    private fun elapsedInWindowSeconds(from: LocalTime, current: LocalTime): Long =
+        if (current >= from) (current.toSecondOfDay() - from.toSecondOfDay()).toLong()
+        else (86400 - from.toSecondOfDay() + current.toSecondOfDay()).toLong()
 
     fun supplementShouldFire(
         config: SupplementConfig,
@@ -53,9 +78,7 @@ object ReminderEvaluator {
         lastFired: Instant,
     ): Boolean {
         if (now.epochSecond - lastFired.epochSecond < 3600L) return false
-        return config.scheduledTimes.any { scheduled ->
-            Math.abs(currentTime.toSecondOfDay() - scheduled.toSecondOfDay()) <= 600
-        }
+        return Math.abs(currentTime.toSecondOfDay() - config.scheduledTime.toSecondOfDay()) <= 600
     }
 
     fun screenBreakShouldFire(

@@ -1,14 +1,10 @@
 package de.stroebele.mindyourself.ui.screen
 
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyListState
@@ -34,11 +30,11 @@ import de.stroebele.mindyourself.ui.viewmodel.HomeViewModel
 fun HomeScreen(
     onLogHydration: () -> Unit,
     onLogSupplement: (String) -> Unit,
+    onNavigateToSettings: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState: ScalingLazyListState = rememberScalingLazyListState()
-    val context = LocalContext.current
 
     AppScaffold {
         ScreenScaffold(
@@ -52,35 +48,31 @@ fun HomeScreen(
                     Text(text = "mindYourself")
                 }
 
-                // Hydration quick-log
+                // Hydration quick-log with progress
                 item {
                     Button(onClick = onLogHydration) {
-                        Text("💧 ${uiState.todayHydrationMl} ml")
+                        Text("💧 ${uiState.todayHydrationMl} / ${uiState.hydrationGoalMl} ml (${uiState.hydrationPercent}%)")
                     }
                 }
 
-                // Supplement quick-log buttons (one per configured supplement)
+                // Supplement summary (read-only) + quick-log buttons
+                item {
+                    Text("💊 ${uiState.supplementsTakenToday} von ${uiState.supplementsTotalToday}")
+                }
                 items(uiState.supplementNames) { name ->
                     Button(onClick = { onLogSupplement(name) }) {
                         Text("💊 $name")
                     }
                 }
 
-                // Today's step count (read-only, from PassiveListenerService)
+                // Today's step count with goal and percentage
                 item {
-                    Text(text = "👟 ${uiState.todaySteps} Schritte")
+                    Text(text = "👟 ${uiState.todaySteps} / ${uiState.stepDailyGoal} (${uiState.stepsPercent}%)")
                 }
 
-                // App settings (permissions etc.) → system settings
+                // Settings menu
                 item {
-                    Button(onClick = {
-                        context.startActivity(
-                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", context.packageName, null)
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                        )
-                    }) {
+                    Button(onClick = onNavigateToSettings) {
                         Text("Einstellungen")
                     }
                 }

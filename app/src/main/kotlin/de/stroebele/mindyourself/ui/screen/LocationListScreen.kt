@@ -65,7 +65,11 @@ fun LocationListScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Orte") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Orte") },
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddLocation) {
                 Icon(Icons.Default.Add, contentDescription = "Ort hinzufügen")

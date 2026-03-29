@@ -1,5 +1,6 @@
 package de.stroebele.mindyourself.data.repository
 
+import android.util.Log
 import androidx.room.withTransaction
 import de.stroebele.mindyourself.data.db.AppDatabase
 import de.stroebele.mindyourself.data.db.dao.ReminderConfigDao
@@ -17,13 +18,27 @@ class ReminderConfigRepositoryImpl @Inject constructor(
 ) : ReminderConfigRepository {
 
     override fun observeAll(): Flow<List<ReminderConfig>> =
-        dao.observeAll().map { entities -> entities.map { it.toDomain() } }
+        dao.observeAll().map { entities ->
+            entities.mapNotNull { entity ->
+                runCatching { entity.toDomain() }
+                    .onFailure { e -> Log.e(TAG, "Failed to deserialize config[${entity.id}], skipping", e) }
+                    .getOrNull()
+            }
+        }
 
     override suspend fun getAll(): List<ReminderConfig> =
-        dao.getAll().map { it.toDomain() }
+        dao.getAll().mapNotNull { entity ->
+            runCatching { entity.toDomain() }
+                .onFailure { e -> Log.e(TAG, "Failed to deserialize config[${entity.id}], skipping", e) }
+                .getOrNull()
+        }
 
     override suspend fun getById(id: Long): ReminderConfig? =
-        dao.getById(id)?.toDomain()
+        dao.getById(id)?.let { entity ->
+            runCatching { entity.toDomain() }
+                .onFailure { e -> Log.e(TAG, "Failed to deserialize config[${entity.id}], skipping", e) }
+                .getOrNull()
+        }
 
     override suspend fun save(config: ReminderConfig): Long =
         dao.upsert(config.toEntity())
@@ -36,4 +51,8 @@ class ReminderConfigRepositoryImpl @Inject constructor(
             dao.deleteAll()
             dao.upsertAll(configs.map { it.toEntity() })
         }
+
+    companion object {
+        private const val TAG = "ReminderConfigRepo"
+    }
 }

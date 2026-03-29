@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Watch ↔ Phone sync -->
     <uses-permission android:name="com.google.android.permission.PROVIDE_BACKGROUND" />
+
+    <!-- Health Connect -->
+    <uses-permission android:name="android.permission.health.READ_HYDRATION" />
+    <uses-permission android:name="android.permission.health.WRITE_HYDRATION" />
 
     <!-- Location (for capturing named location fingerprints in Settings) -->
     <!-- ACCESS_WIFI_STATE: general WiFi state access -->
@@ -53,7 +58,31 @@
         </service>
 
         <!-- Health Connect permissions rationale screen (required for Play Store) -->
-        <!-- TODO: <activity android:name=".PermissionsRationaleActivity" android:exported="true"> -->
+        <activity
+            android:name=".healthconnect.HealthConnectPermissionActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+            <meta-data
+                android:name="health_permissions"
+                android:resource="@array/health_permissions" />
+        </activity>
+
+        <!--
+            Disable WorkManager's auto-initializer so HiltWorkerFactory is used
+            (same pattern as the wear module).
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
     </application>
 

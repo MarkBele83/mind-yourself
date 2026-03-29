@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import de.stroebele.mindyourself.domain.model.ReminderConfig
 import de.stroebele.mindyourself.domain.model.ReminderType
+import de.stroebele.mindyourself.domain.model.SupplementConfig
 import de.stroebele.mindyourself.ui.viewmodel.ReminderListViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,7 +95,11 @@ private fun ReminderCard(
             Text(config.type.icon(), modifier = Modifier.padding(end = 4.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = config.label)
-                Text(text = "${config.activeFrom} – ${config.activeUntil}")
+                val timeLabel = when (val tc = config.typeConfig) {
+                    is SupplementConfig -> tc.scheduledTime.toString()
+                    else -> "${config.activeFrom} – ${config.activeUntil}"
+                }
+                Text(text = timeLabel)
             }
             Switch(checked = config.enabled, onCheckedChange = { onToggle() })
             IconButton(onClick = onDelete) {

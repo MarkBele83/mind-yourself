@@ -29,7 +29,6 @@ class HandleNotificationActionWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val actionName = inputData.getString(KEY_ACTION) ?: return Result.failure()
         val notifId = inputData.getInt(KEY_NOTIF_ID, -1)
-        val supplementName = inputData.getString(KEY_SUPPLEMENT_NAME)
 
         when (Action.valueOf(actionName)) {
             Action.DISMISS -> notificationDispatcher.cancel(notifId)
@@ -51,10 +50,11 @@ class HandleNotificationActionWorker @AssistedInject constructor(
                 Log.d(TAG, "Logged ${DEFAULT_HYDRATION_ML}ml hydration")
             }
             Action.LOG_SUPPLEMENT -> {
-                supplementName?.let {
-                    supplementRepository.log(it)
-                    Log.d(TAG, "Logged supplement: $it")
-                }
+                supplementRepository.log("")
+                notificationDispatcher.cancel(notifId)
+            }
+            Action.OPEN_HYDRATION_LOG -> {
+                // Handled in NotificationActionReceiver — should not reach here
                 notificationDispatcher.cancel(notifId)
             }
         }
@@ -65,7 +65,6 @@ class HandleNotificationActionWorker @AssistedInject constructor(
     companion object {
         const val KEY_ACTION = "action"
         const val KEY_NOTIF_ID = "notif_id"
-        const val KEY_SUPPLEMENT_NAME = "supplement_name"
         private const val DEFAULT_HYDRATION_ML = 250
         private const val TAG = "HandleNotificationActionWorker"
     }

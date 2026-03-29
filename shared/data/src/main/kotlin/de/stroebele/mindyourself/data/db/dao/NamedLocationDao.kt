@@ -25,6 +25,12 @@ interface NamedLocationDao {
     @Query("DELETE FROM named_locations WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("DELETE FROM named_locations")
+    suspend fun deleteAll()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(entities: List<NamedLocationEntity>)
+
     @Query("SELECT COUNT(*) FROM named_locations WHERE name = :name AND id != :excludeId")
     suspend fun countByName(name: String, excludeId: Long): Int
 }

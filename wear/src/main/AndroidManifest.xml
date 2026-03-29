@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Wear OS identification -->
     <uses-feature android:name="android.hardware.type.watch" />
@@ -22,6 +23,11 @@
 
     <!-- WorkManager (required for reliable background work on Wear OS) -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Allow the app to request exemption from battery optimisation.
+         Without this, Android can defer or kill WorkManager jobs when the app
+         is in the restricted battery bucket, making reminders unreliable. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Watch ↔ Phone sync -->
     <uses-permission android:name="com.google.android.permission.PROVIDE_BACKGROUND" />
@@ -65,15 +71,27 @@
             android:foregroundServiceType="health"
             android:permission="android.permission.BIND_LISTENER_SERVICE" />
 
-        <!-- Receives reminder configs pushed from Phone via Wear Data Layer API -->
+        <!-- Receives data pushed from Phone via Wear Data Layer API -->
         <service
-            android:name=".sync.WearSyncService"
+            android:name=".wear.sync.WearSyncService"
             android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
                 <data
                     android:host="*"
                     android:pathPrefix="/reminder_configs"
+                    android:scheme="wear" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/vacation_settings"
+                    android:scheme="wear" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/app_settings"
+                    android:scheme="wear" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/hydration_hc_logs"
                     android:scheme="wear" />
             </intent-filter>
         </service>
@@ -91,6 +109,25 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!--
+            Disable WorkManager's auto-initializer so that WorkManager is NOT
+            initialized before Application.onCreate() (where Hilt injects the
+            HiltWorkerFactory into our Configuration.Provider).
+            Without this, WorkManagerInitializer runs via androidx.startup
+            before Hilt is ready, causing NoSuchMethodException when Workers
+            with @HiltWorker/@AssistedInject are instantiated.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
     </application>
 

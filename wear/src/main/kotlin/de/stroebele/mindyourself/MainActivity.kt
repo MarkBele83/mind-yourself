@@ -1,9 +1,14 @@
 package de.stroebele.mindyourself
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -149,7 +154,37 @@ class MainActivity : ComponentActivity() {
 
     private fun onCorePermissionsGranted() {
         scope.launch { passiveMonitoringManager.register() }
+        // Application.onCreate() already schedules this, but calling here (KEEP policy)
+        // ensures it's also scheduled when permissions are newly granted for the first time.
         ReminderEvaluationWorker.schedule(WorkManager.getInstance(this))
+        requestBatteryOptimizationExemption()
+    }
+
+    /**
+     * Asks the system to exempt this app from battery optimisation.
+     * Without this, Android can move the app to the restricted bucket and defer
+     * or skip WorkManager jobs entirely, making reminders unreliable in the background.
+     * The system shows a confirmation dialog; the user can decline.
+     */
+    private fun requestBatteryOptimizationExemption() {
+        val pm = getSystemService(PowerManager::class.java)
+        if (pm.isIgnoringBatteryOptimizations(packageName)) {
+            Log.d(TAG, "Battery optimisation already disabled — no action needed")
+            return
+        }
+        Log.i(TAG, "Requesting battery optimisation exemption")
+        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = Uri.parse("package:$packageName")
+        }
+        if (intent.resolveActivity(packageManager) != null) {
+            startActivity(intent)
+        } else {
+            Log.w(TAG, "ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS not available on this device")
+        }
+    }
+
+    companion object {
+        private const val TAG = "MainActivity"
     }
 }
 

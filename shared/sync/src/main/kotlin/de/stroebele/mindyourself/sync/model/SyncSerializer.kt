@@ -127,6 +127,37 @@ object SyncSerializer {
         return VacationSettingsDto(periods = periods)
     }
 
+    // ── HydrationExternalLogDto ───────────────────────────────────────────────
+
+    fun List<HydrationExternalLogDto>.hcHydrationToJsonBytes(): ByteArray =
+        joinToString(",", "[", "]") { """{"healthConnectId":${it.healthConnectId.jsonStr()},"amountMl":${it.amountMl},"timestampEpochMs":${it.timestampEpochMs}}""" }
+            .toByteArray(Charsets.UTF_8)
+
+    fun ByteArray.toHcHydrationLogList(): List<HydrationExternalLogDto> {
+        val json = toString(Charsets.UTF_8).trim().removePrefix("[").removeSuffix("]")
+        if (json.isBlank()) return emptyList()
+        return splitJsonObjects(json).map {
+            HydrationExternalLogDto(
+                healthConnectId = it.extract("healthConnectId"),
+                amountMl = it.extractInt("amountMl"),
+                timestampEpochMs = it.extractLong("timestampEpochMs"),
+            )
+        }
+    }
+
+    // ── AppSettingsDto ────────────────────────────────────────────────────────
+
+    fun AppSettingsDto.toAppSettingsJsonBytes(): ByteArray =
+        """{"stepDailyGoal":$stepDailyGoal,"hydrationDailyGoalMl":$hydrationDailyGoalMl}""".toByteArray(Charsets.UTF_8)
+
+    fun ByteArray.toAppSettings(): AppSettingsDto {
+        val json = toString(Charsets.UTF_8)
+        return AppSettingsDto(
+            stepDailyGoal = json.extractInt("stepDailyGoal"),
+            hydrationDailyGoalMl = try { json.extractInt("hydrationDailyGoalMl") } catch (e: Exception) { 0 },
+        )
+    }
+
     /** Splits a flat JSON array body into individual object strings. */
     private fun splitJsonObjects(json: String): List<String> {
         val objects = mutableListOf<String>()

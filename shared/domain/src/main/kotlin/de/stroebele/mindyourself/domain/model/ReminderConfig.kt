@@ -39,7 +39,9 @@ sealed interface ReminderTypeConfig
 data class MovementConfig(
     /** Minimum steps required within [windowMinutes] */
     val stepThreshold: Int = 500,
-    val windowMinutes: Int = 120,
+    val windowMinutes: Int = 30,
+    /** Minimum minutes between repeat reminders */
+    val repeatIntervalMinutes: Int = 30,
 ) : ReminderTypeConfig
 
 data class SedentaryConfig(
@@ -50,16 +52,27 @@ data class SedentaryConfig(
 ) : ReminderTypeConfig
 
 data class HydrationConfig(
-    /** Daily goal in milliliters */
-    val dailyGoalMl: Int = 2000,
-    /** Minimum interval between reminders in minutes */
-    val intervalMinutes: Int = 60,
+    /** Reminder goal in milliliters (per reminder window) */
+    val reminderGoalMl: Int = 2000,
+    /** Minimum minutes between repeat reminders */
+    val repeatIntervalMinutes: Int = 60,
+    /** Fire if no log recorded in the last Z minutes */
+    val noLogWindowMinutes: Int = 60,
 ) : ReminderTypeConfig
 
+enum class SupplementForm { CAPSULE, PILL, DROP, GUM }
+
+data class SupplementItem(
+    val name: String,
+    val amount: Int = 1,
+    val form: SupplementForm = SupplementForm.CAPSULE,
+)
+
 data class SupplementConfig(
-    val supplementName: String,
-    /** Scheduled times to take this supplement */
-    val scheduledTimes: List<LocalTime>,
+    /** Time at which this reminder fires */
+    val scheduledTime: LocalTime,
+    /** One or more supplements to take at this time */
+    val items: List<SupplementItem>,
     /** Snooze duration in minutes if user taps "Remind me later" */
     val snoozeDurationMinutes: Int = 30,
 ) : ReminderTypeConfig

@@ -49,7 +49,7 @@ fun HistoryScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Hydration") },
+                    text = { Text("Trinken") },
                 )
                 Tab(
                     selected = selectedTab == 1,

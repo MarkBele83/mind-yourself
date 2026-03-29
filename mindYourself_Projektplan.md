@@ -46,7 +46,7 @@ Beide Apps werden als **ein App Bundle** im Google Play Store veröffentlicht �
 | Gesundheitsdaten Phone | Health Connect API |
 | Watch ↔ Phone Sync | Wear Data Layer API |
 | Standort | Fused Location Provider |
-| IDE | Android Studio + VS Code + GitHub Copilot |
+| IDE | Android Studio + VS Code + Claude Code |
 | Entwicklungsgerät | Mac Mini |
 
 ---

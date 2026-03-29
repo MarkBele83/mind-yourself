@@ -13,8 +13,8 @@ android {
         applicationId = "de.stroebele.mindyourself"
         minSdk = 30  // Wear OS 3 / Android 11
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 17
+        versionName = "1.5.11"
     }
 
     compileOptions {

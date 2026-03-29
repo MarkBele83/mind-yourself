@@ -11,18 +11,23 @@ import dagger.hilt.components.SingletonComponent
 import de.stroebele.mindyourself.data.db.AppDatabase
 import de.stroebele.mindyourself.data.db.dao.HealthCacheDao
 import de.stroebele.mindyourself.data.db.dao.HydrationDao
+import de.stroebele.mindyourself.data.db.dao.HydrationPortionSizeDao
 import de.stroebele.mindyourself.data.db.dao.NamedLocationDao
 import de.stroebele.mindyourself.data.db.dao.ReminderConfigDao
 import de.stroebele.mindyourself.data.db.dao.ReminderStateDao
 import de.stroebele.mindyourself.data.db.dao.SupplementDao
 import de.stroebele.mindyourself.data.repository.HealthCacheRepositoryImpl
+import de.stroebele.mindyourself.data.repository.HydrationPortionSizeRepositoryImpl
 import de.stroebele.mindyourself.data.repository.HydrationRepositoryImpl
 import de.stroebele.mindyourself.data.repository.NamedLocationRepositoryImpl
 import de.stroebele.mindyourself.data.repository.ReminderConfigRepositoryImpl
 import de.stroebele.mindyourself.data.repository.ReminderStateRepositoryImpl
 import de.stroebele.mindyourself.data.repository.SupplementRepositoryImpl
+import de.stroebele.mindyourself.data.repository.AppSettingsRepositoryImpl
 import de.stroebele.mindyourself.data.repository.VacationSettingsRepositoryImpl
+import de.stroebele.mindyourself.domain.repository.AppSettingsRepository
 import de.stroebele.mindyourself.domain.repository.HealthCacheRepository
+import de.stroebele.mindyourself.domain.repository.HydrationPortionSizeRepository
 import de.stroebele.mindyourself.domain.repository.HydrationRepository
 import de.stroebele.mindyourself.domain.repository.NamedLocationRepository
 import de.stroebele.mindyourself.domain.repository.ReminderConfigRepository
@@ -39,7 +44,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "mindyourself.db")
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
             .build()
 
     @Provides fun provideReminderConfigDao(db: AppDatabase): ReminderConfigDao = db.reminderConfigDao()
@@ -48,6 +53,7 @@ object DatabaseModule {
     @Provides fun provideSupplementDao(db: AppDatabase): SupplementDao = db.supplementDao()
     @Provides fun provideHealthCacheDao(db: AppDatabase): HealthCacheDao = db.healthCacheDao()
     @Provides fun provideNamedLocationDao(db: AppDatabase): NamedLocationDao = db.namedLocationDao()
+    @Provides fun provideHydrationPortionSizeDao(db: AppDatabase): HydrationPortionSizeDao = db.hydrationPortionSizeDao()
 }
 
 @Module
@@ -61,4 +67,6 @@ abstract class RepositoryModule {
     @Binds abstract fun bindHealthCacheRepo(impl: HealthCacheRepositoryImpl): HealthCacheRepository
     @Binds abstract fun bindNamedLocationRepo(impl: NamedLocationRepositoryImpl): NamedLocationRepository
     @Binds abstract fun bindVacationSettingsRepo(impl: VacationSettingsRepositoryImpl): VacationSettingsRepository
+    @Binds abstract fun bindHydrationPortionSizeRepo(impl: HydrationPortionSizeRepositoryImpl): HydrationPortionSizeRepository
+    @Binds abstract fun bindAppSettingsRepo(impl: AppSettingsRepositoryImpl): AppSettingsRepository
 }

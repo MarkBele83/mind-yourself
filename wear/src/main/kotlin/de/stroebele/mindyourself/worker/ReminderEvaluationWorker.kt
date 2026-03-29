@@ -18,6 +18,7 @@ import de.stroebele.mindyourself.domain.model.ReminderType
 import de.stroebele.mindyourself.domain.model.ScreenBreakConfig
 import de.stroebele.mindyourself.domain.model.SedentaryConfig
 import de.stroebele.mindyourself.domain.model.SupplementConfig
+import de.stroebele.mindyourself.domain.repository.AppSettingsRepository
 import de.stroebele.mindyourself.domain.repository.HealthCacheRepository
 import de.stroebele.mindyourself.domain.repository.HydrationRepository
 import de.stroebele.mindyourself.domain.repository.NamedLocationRepository
@@ -50,6 +51,7 @@ class ReminderEvaluationWorker @AssistedInject constructor(
     private val locationResolver: LocationResolver,
     private val notificationDispatcher: NotificationDispatcher,
     private val vacationSettingsRepository: VacationSettingsRepository,
+    private val appSettingsRepository: AppSettingsRepository,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -62,8 +64,23 @@ class ReminderEvaluationWorker @AssistedInject constructor(
         val namedLocations = namedLocationRepository.getAll()
 
         val vacationSettings = vacationSettingsRepository.observe().first()
+        val appSettings = appSettingsRepository.observe().first()
+        val dailyGoalMl = appSettings.hydrationDailyGoalMl
         val now2 = LocalDateTime.now()
         val isVacationActive = vacationSettings.periods.any { now2 >= it.from && now2 <= it.until }
+
+        // Pre-compute today's hydration total once for all hydration reminders
+        val allHydrationConfigs = configs.filter { it.enabled && it.type == ReminderType.HYDRATION }
+        val hydrationWindowData = if (allHydrationConfigs.isNotEmpty()) {
+            val unionFrom = allHydrationConfigs.minOf { it.activeFrom }
+            val unionUntil = allHydrationConfigs.maxOf { it.activeUntil }
+            val todayDate = localNow.toLocalDate()
+            val windowFromInstant = todayDate.atTime(unionFrom).atZone(ZoneId.systemDefault()).toInstant()
+            val windowUntilInstant = todayDate.atTime(unionUntil).atZone(ZoneId.systemDefault()).toInstant()
+            val todayMl = hydrationRepository.getTodayTotalMl()
+            val lastLogInWindow = hydrationRepository.getLastLogTimeInWindow(windowFromInstant, windowUntilInstant)
+            Triple(todayMl, lastLogInWindow, windowUntilInstant)
+        } else null
 
         for (config in configs) {
             if (!config.enabled) continue
@@ -86,7 +103,10 @@ class ReminderEvaluationWorker @AssistedInject constructor(
                 val fired = when (config.type) {
                     ReminderType.MOVEMENT -> evaluateMovement(config.typeConfig as MovementConfig, now, state.lastFired)
                     ReminderType.SEDENTARY -> evaluateSedentary(config.typeConfig as SedentaryConfig, now, state.lastFired)
-                    ReminderType.HYDRATION -> evaluateHydration(config.typeConfig as HydrationConfig, now, state.lastFired)
+                    ReminderType.HYDRATION -> {
+                        val (todayMl, lastLogInWindow, _) = hydrationWindowData!!
+                        evaluateHydration(config.typeConfig as HydrationConfig, config, now, state.lastFired, currentTime, todayMl, lastLogInWindow, dailyGoalMl)
+                    }
                     ReminderType.SUPPLEMENT -> evaluateSupplement(config.typeConfig as SupplementConfig, currentTime, now, state.lastFired)
                     ReminderType.SCREEN_BREAK -> evaluateScreenBreak(config.typeConfig as ScreenBreakConfig, now, state.lastFired)
                 }
@@ -120,7 +140,7 @@ class ReminderEvaluationWorker @AssistedInject constructor(
         val steps = healthCacheRepository.getStepsBetween(windowStart, now)
         if (ReminderEvaluator.movementShouldFire(config, steps, now, lastFired)) {
             Log.d(TAG, "Movement: $steps steps in ${config.windowMinutes}min < threshold ${config.stepThreshold}")
-            notificationDispatcher.showMovementReminder()
+            notificationDispatcher.showMovementReminder(steps, config.stepThreshold, config.windowMinutes)
             return true
         }
         return false
@@ -136,11 +156,24 @@ class ReminderEvaluationWorker @AssistedInject constructor(
         return false
     }
 
-    private suspend fun evaluateHydration(config: HydrationConfig, now: Instant, lastFired: Instant): Boolean {
-        val todayMl = hydrationRepository.getTodayTotalMl()
-        if (ReminderEvaluator.hydrationShouldFire(config, todayMl, now, lastFired)) {
-            Log.d(TAG, "Hydration: ${todayMl}ml logged, ${config.dailyGoalMl - todayMl}ml remaining")
-            notificationDispatcher.showHydrationReminder(config.dailyGoalMl - todayMl)
+    private suspend fun evaluateHydration(
+        config: HydrationConfig,
+        reminderConfig: ReminderConfig,
+        now: Instant,
+        lastFired: Instant,
+        currentTime: LocalTime,
+        todayMl: Int,
+        lastLogInWindow: Instant?,
+        dailyGoalMl: Int,
+    ): Boolean {
+        if (ReminderEvaluator.hydrationShouldFire(
+                config, todayMl, dailyGoalMl, lastLogInWindow, now, lastFired,
+                currentTime, reminderConfig.activeFrom, reminderConfig.activeUntil,
+            )
+        ) {
+            val effectiveGoal = if (dailyGoalMl > 0) dailyGoalMl else config.reminderGoalMl
+            Log.d(TAG, "Hydration: ${todayMl}ml / ${effectiveGoal}ml")
+            notificationDispatcher.showHydrationReminder(todayMl, effectiveGoal)
             return true
         }
         return false
@@ -148,8 +181,8 @@ class ReminderEvaluationWorker @AssistedInject constructor(
 
     private fun evaluateSupplement(config: SupplementConfig, currentTime: LocalTime, now: Instant, lastFired: Instant): Boolean {
         if (ReminderEvaluator.supplementShouldFire(config, currentTime, now, lastFired)) {
-            Log.d(TAG, "Supplement: ${config.supplementName}")
-            notificationDispatcher.showSupplementReminder(config.supplementName)
+            Log.d(TAG, "Supplement: ${config.items.size} items at ${config.scheduledTime}")
+            notificationDispatcher.showSupplementReminder(config.items)
             return true
         }
         return false

@@ -13,6 +13,8 @@ import de.stroebele.mindyourself.domain.model.ReminderType
 import de.stroebele.mindyourself.domain.model.ScreenBreakConfig
 import de.stroebele.mindyourself.domain.model.SedentaryConfig
 import de.stroebele.mindyourself.domain.model.SupplementConfig
+import de.stroebele.mindyourself.domain.model.SupplementForm
+import de.stroebele.mindyourself.domain.model.SupplementItem
 import de.stroebele.mindyourself.domain.repository.NamedLocationRepository
 import de.stroebele.mindyourself.domain.repository.ReminderConfigRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -128,8 +130,8 @@ class ReminderEditViewModel @Inject constructor(
             ReminderType.SEDENTARY -> SedentaryConfig()
             ReminderType.HYDRATION -> HydrationConfig()
             ReminderType.SUPPLEMENT -> SupplementConfig(
-                supplementName = "Supplement",
-                scheduledTimes = listOf(LocalTime.of(8, 0)),
+                scheduledTime = LocalTime.of(8, 0),
+                items = listOf(SupplementItem(name = "", amount = 1, form = SupplementForm.CAPSULE)),
             )
             ReminderType.SCREEN_BREAK -> ScreenBreakConfig()
         },
@@ -137,9 +139,9 @@ class ReminderEditViewModel @Inject constructor(
 }
 
 private fun ReminderType.defaultLabel(): String = when (this) {
-    ReminderType.MOVEMENT -> "Bewegungserinnerung"
+    ReminderType.MOVEMENT -> "Bewegung"
     ReminderType.SEDENTARY -> "Sitz-Pause"
-    ReminderType.HYDRATION -> "Hydration"
+    ReminderType.HYDRATION -> "Trinken"
     ReminderType.SUPPLEMENT -> "Supplement"
     ReminderType.SCREEN_BREAK -> "Bildschirmpause"
 }

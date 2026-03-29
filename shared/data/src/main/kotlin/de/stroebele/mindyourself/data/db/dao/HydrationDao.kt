@@ -16,8 +16,20 @@ interface HydrationDao {
     @Query("SELECT COALESCE(SUM(amountMl), 0) FROM hydration_logs WHERE timestampEpochMs >= :startOfDayMs")
     suspend fun getTodayTotalMl(startOfDayMs: Long): Int
 
-    @Query("SELECT * FROM hydration_logs WHERE synced = 0")
+    @Query("SELECT MAX(timestampEpochMs) FROM hydration_logs WHERE timestampEpochMs >= :startOfDayMs")
+    suspend fun getLastLogTimeMsToday(startOfDayMs: Long): Long?
+
+    @Query("SELECT * FROM hydration_logs WHERE synced = 0 AND healthConnectId IS NULL")
     suspend fun getUnsynced(): List<HydrationLogEntity>
+
+    @Query("SELECT COALESCE(SUM(amountMl), 0) FROM hydration_logs WHERE timestampEpochMs >= :fromMs AND timestampEpochMs <= :toMs")
+    suspend fun getTotalMlBetween(fromMs: Long, toMs: Long): Int
+
+    @Query("SELECT MAX(timestampEpochMs) FROM hydration_logs WHERE timestampEpochMs >= :fromMs AND timestampEpochMs <= :toMs")
+    suspend fun getLastLogTimeMsBetween(fromMs: Long, toMs: Long): Long?
+
+    @Query("SELECT * FROM hydration_logs WHERE timestampEpochMs >= :fromMs ORDER BY timestampEpochMs DESC")
+    suspend fun getLogsFrom(fromMs: Long): List<HydrationLogEntity>
 
     @Insert
     suspend fun insert(entity: HydrationLogEntity): Long

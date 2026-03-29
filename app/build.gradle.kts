@@ -13,8 +13,8 @@ android {
         applicationId = "de.stroebele.mindyourself"
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 17
+        versionName = "1.5.11"
     }
 
     compileOptions {
@@ -51,7 +51,9 @@ dependencies {
     implementation(libs.health.connect.client)
 
     implementation(libs.hilt.android)
+    implementation(libs.androidx.hilt.work)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.work.runtime.ktx)
     ksp(libs.hilt.compiler)
     ksp(libs.androidx.hilt.compiler)
 
