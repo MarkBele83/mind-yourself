@@ -20,4 +20,6 @@ data class ReminderConfigEntity(
     val activeInVacation: Boolean = false,
     /** JSON-serialized LocationFilter, or null if no location constraint. */
     val locationFilterJson: String? = null,
+    /** Auto-dismiss timeout in minutes. Null = manual dismiss only. */
+    val notificationTimeoutMinutes: Int? = null,
 )

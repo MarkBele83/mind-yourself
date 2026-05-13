@@ -23,6 +23,8 @@ data class ReminderConfig(
     val activeInVacation: Boolean = false,
     /** Optional location constraint. Null means the reminder fires at any location. */
     val locationFilter: LocationFilter? = null,
+    /** Auto-dismiss the notification after this many minutes. Null = manual dismiss only. */
+    val notificationTimeoutMinutes: Int? = null,
 )
 
 enum class ReminderType {

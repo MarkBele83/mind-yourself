@@ -189,6 +189,39 @@ fun ReminderEditScreen(
                 )
             }
 
+            // Notification timeout
+            val timeoutEnabled = config.notificationTimeoutMinutes != null
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text("Automatisch schließen")
+                    Text(
+                        "Benachrichtigung nach einer Zeit automatisch entfernen",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Switch(
+                    checked = timeoutEnabled,
+                    onCheckedChange = { enabled ->
+                        viewModel.update(
+                            config.copy(notificationTimeoutMinutes = if (enabled) 5 else null)
+                        )
+                    },
+                )
+            }
+            if (timeoutEnabled) {
+                NumberField(
+                    label = "Minuten bis zum automatischen Schließen",
+                    value = config.notificationTimeoutMinutes!!,
+                    onValueChange = {
+                        viewModel.update(config.copy(notificationTimeoutMinutes = it.coerceAtLeast(1)))
+                    },
+                )
+            }
+
             Button(
                 onClick = { viewModel.save() },
                 modifier = Modifier.fillMaxWidth(),

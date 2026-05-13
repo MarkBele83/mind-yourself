@@ -93,6 +93,7 @@ fun ReminderConfigEntity.toDomain(): ReminderConfig = ReminderConfig(
     typeConfig = deserializeTypeConfig(ReminderType.valueOf(type), typeConfigJson),
     activeInVacation = activeInVacation,
     locationFilter = locationFilterJson?.let { deserializeLocationFilter(it) },
+    notificationTimeoutMinutes = notificationTimeoutMinutes,
 )
 
 fun ReminderConfig.toEntity(): ReminderConfigEntity = ReminderConfigEntity(
@@ -108,6 +109,7 @@ fun ReminderConfig.toEntity(): ReminderConfigEntity = ReminderConfigEntity(
     typeConfigJson = serializeTypeConfig(typeConfig),
     activeInVacation = activeInVacation,
     locationFilterJson = locationFilter?.let { serializeLocationFilter(it) },
+    notificationTimeoutMinutes = notificationTimeoutMinutes,
 )
 
 // ── TypeConfig serialization (manual JSON — no extra library needed) ──────────

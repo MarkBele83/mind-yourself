@@ -31,7 +31,7 @@ import de.stroebele.mindyourself.data.db.entity.SupplementLogEntity
         NamedLocationEntity::class,
         HydrationPortionSizeEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -44,6 +44,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun hydrationPortionSizeDao(): HydrationPortionSizeDao
 
     companion object {
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE reminder_configs ADD COLUMN notificationTimeoutMinutes INTEGER")
+            }
+        }
+
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Adds the unique index on healthConnectId that was missing from
