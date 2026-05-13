@@ -103,6 +103,7 @@ class PhoneSyncUseCase @Inject constructor(
         activeUntilMinute = activeUntil.minute,
         typeConfigJson = serializeTypeConfig(typeConfig),
         activeInVacation = activeInVacation,
+        notificationTimeoutMinutes = notificationTimeoutMinutes,
     )
 
     companion object {

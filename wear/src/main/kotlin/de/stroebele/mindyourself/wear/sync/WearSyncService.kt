@@ -152,6 +152,7 @@ class WearSyncService : WatchSyncListenerService() {
             activeUntil = LocalTime.of(activeUntilHour, activeUntilMinute),
             typeConfig = deserializeTypeConfig(type, typeConfigJson),
             activeInVacation = activeInVacation,
+            notificationTimeoutMinutes = notificationTimeoutMinutes,
         )
     }
 

@@ -101,14 +101,14 @@ class ReminderEvaluationWorker @AssistedInject constructor(
 
             try {
                 val fired = when (config.type) {
-                    ReminderType.MOVEMENT -> evaluateMovement(config.typeConfig as MovementConfig, now, state.lastFired)
-                    ReminderType.SEDENTARY -> evaluateSedentary(config.typeConfig as SedentaryConfig, now, state.lastFired)
+                    ReminderType.MOVEMENT -> evaluateMovement(config.typeConfig as MovementConfig, now, state.lastFired, config.notificationTimeoutMinutes)
+                    ReminderType.SEDENTARY -> evaluateSedentary(config.typeConfig as SedentaryConfig, now, state.lastFired, config.notificationTimeoutMinutes)
                     ReminderType.HYDRATION -> {
                         val (todayMl, lastLogInWindow, _) = hydrationWindowData!!
-                        evaluateHydration(config.typeConfig as HydrationConfig, config, now, state.lastFired, currentTime, todayMl, lastLogInWindow, dailyGoalMl)
+                        evaluateHydration(config.typeConfig as HydrationConfig, config, now, state.lastFired, currentTime, todayMl, lastLogInWindow, dailyGoalMl, config.notificationTimeoutMinutes)
                     }
-                    ReminderType.SUPPLEMENT -> evaluateSupplement(config.typeConfig as SupplementConfig, currentTime, now, state.lastFired)
-                    ReminderType.SCREEN_BREAK -> evaluateScreenBreak(config.typeConfig as ScreenBreakConfig, now, state.lastFired)
+                    ReminderType.SUPPLEMENT -> evaluateSupplement(config.typeConfig as SupplementConfig, currentTime, now, state.lastFired, config.notificationTimeoutMinutes)
+                    ReminderType.SCREEN_BREAK -> evaluateScreenBreak(config.typeConfig as ScreenBreakConfig, now, state.lastFired, config.notificationTimeoutMinutes)
                 }
                 if (fired) reminderStateRepository.markFired(config.type, now)
             } catch (e: Exception) {
@@ -135,22 +135,22 @@ class ReminderEvaluationWorker @AssistedInject constructor(
     }
 
     /** Returns true if a notification was dispatched. */
-    private suspend fun evaluateMovement(config: MovementConfig, now: Instant, lastFired: Instant): Boolean {
+    private suspend fun evaluateMovement(config: MovementConfig, now: Instant, lastFired: Instant, timeoutMinutes: Int?): Boolean {
         val windowStart = now.minusSeconds(config.windowMinutes * 60L)
         val steps = healthCacheRepository.getStepsBetween(windowStart, now)
         if (ReminderEvaluator.movementShouldFire(config, steps, now, lastFired)) {
             Log.d(TAG, "Movement: $steps steps in ${config.windowMinutes}min < threshold ${config.stepThreshold}")
-            notificationDispatcher.showMovementReminder(steps, config.stepThreshold, config.windowMinutes)
+            notificationDispatcher.showMovementReminder(steps, config.stepThreshold, config.windowMinutes, timeoutMinutes)
             return true
         }
         return false
     }
 
-    private suspend fun evaluateSedentary(config: SedentaryConfig, now: Instant, lastFired: Instant): Boolean {
+    private suspend fun evaluateSedentary(config: SedentaryConfig, now: Instant, lastFired: Instant, timeoutMinutes: Int?): Boolean {
         val passiveDurationMs = healthCacheRepository.continuousDurationInState(ActivityState.PASSIVE, now)
         if (ReminderEvaluator.sedentaryShouldFire(config, passiveDurationMs, now, lastFired)) {
             Log.d(TAG, "Sedentary: ${passiveDurationMs / 60_000}min >= threshold ${config.inactiveThresholdMinutes}min")
-            notificationDispatcher.showSedentaryReminder()
+            notificationDispatcher.showSedentaryReminder(timeoutMinutes)
             return true
         }
         return false
@@ -165,6 +165,7 @@ class ReminderEvaluationWorker @AssistedInject constructor(
         todayMl: Int,
         lastLogInWindow: Instant?,
         dailyGoalMl: Int,
+        timeoutMinutes: Int?,
     ): Boolean {
         if (ReminderEvaluator.hydrationShouldFire(
                 config, todayMl, dailyGoalMl, lastLogInWindow, now, lastFired,
@@ -173,25 +174,25 @@ class ReminderEvaluationWorker @AssistedInject constructor(
         ) {
             val effectiveGoal = if (dailyGoalMl > 0) dailyGoalMl else config.reminderGoalMl
             Log.d(TAG, "Hydration: ${todayMl}ml / ${effectiveGoal}ml")
-            notificationDispatcher.showHydrationReminder(todayMl, effectiveGoal)
+            notificationDispatcher.showHydrationReminder(todayMl, effectiveGoal, timeoutMinutes)
             return true
         }
         return false
     }
 
-    private fun evaluateSupplement(config: SupplementConfig, currentTime: LocalTime, now: Instant, lastFired: Instant): Boolean {
+    private fun evaluateSupplement(config: SupplementConfig, currentTime: LocalTime, now: Instant, lastFired: Instant, timeoutMinutes: Int?): Boolean {
         if (ReminderEvaluator.supplementShouldFire(config, currentTime, now, lastFired)) {
             Log.d(TAG, "Supplement: ${config.items.size} items at ${config.scheduledTime}")
-            notificationDispatcher.showSupplementReminder(config.items)
+            notificationDispatcher.showSupplementReminder(config.items, timeoutMinutes)
             return true
         }
         return false
     }
 
-    private fun evaluateScreenBreak(config: ScreenBreakConfig, now: Instant, lastFired: Instant): Boolean {
+    private fun evaluateScreenBreak(config: ScreenBreakConfig, now: Instant, lastFired: Instant, timeoutMinutes: Int?): Boolean {
         if (ReminderEvaluator.screenBreakShouldFire(config, now, lastFired)) {
             Log.d(TAG, "Screen break: ${config.intervalMinutes}min interval elapsed")
-            notificationDispatcher.showScreenBreakReminder()
+            notificationDispatcher.showScreenBreakReminder(timeoutMinutes)
             return true
         }
         return false

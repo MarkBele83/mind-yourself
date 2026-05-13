@@ -18,6 +18,7 @@ data class ReminderConfigDto(
     val activeUntilMinute: Int,
     val typeConfigJson: String,
     val activeInVacation: Boolean = false,
+    val notificationTimeoutMinutes: Int? = null,
 )
 
 data class HydrationLogDto(
